@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Config>
+	<string1>This is string 1</string1>
+	<String2>This is string 2</String2>
+    <Bool3>true</Bool3>
+</Config>

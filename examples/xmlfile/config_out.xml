@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Config>
+	<string1>AAA</string1>
+	<String2>This is string 2</String2>
+	<String3>XXX</String3>
+	<Int>-1</Int>
+	<Bool1>false</Bool1>
+	<Bool2>true</Bool2>
+	<Bool3>false</Bool3>
+</Config>

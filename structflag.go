@@ -17,6 +17,7 @@ import (
 // Set is the minimal interface structflag needs to work.
 // It is a subset of flag.FlagSet
 type Set interface {
+	Args() []string
 	BoolVar(p *bool, name string, value bool, usage string)
 	DurationVar(p *time.Duration, name string, value time.Duration, usage string)
 	Float64Var(p *float64, name string, value float64, usage string)
@@ -194,18 +195,22 @@ func structVar(structPtr interface{}, set Set, fieldValuesAsDefault bool) {
 }
 
 // Parse parses args, or if no args are given os.Args[1:]
-func Parse(args ...string) error {
+func Parse(args ...string) ([]string, error) {
 	if set == nil {
 		set = NewSet()
 	}
 	return parse(args, set)
 }
 
-func parse(args []string, set Set) error {
+func parse(args []string, set Set) ([]string, error) {
 	if len(args) == 0 {
 		args = os.Args[1:]
 	}
-	return set.Parse(args)
+	err := set.Parse(args)
+	if err != nil {
+		return nil, err
+	}
+	return set.Args(), nil
 }
 
 // PrintDefaults prints to standard error the default values of all defined command-line flags in the set.
@@ -226,7 +231,7 @@ func PrintDefaults() {
 // then the command line still gets parsed.
 // The error os.ErrNotExist can be ignored if the existence
 // of the configuration file is optional.
-func LoadFileAndParseCommandLine(filename string, structPtr interface{}) error {
+func LoadFileAndParseCommandLine(filename string, structPtr interface{}) ([]string, error) {
 	// Initialize global variable set with unchanged default values
 	// so that a later PrintDefaults() prints the correct default values.
 	StructVar(structPtr)
@@ -241,25 +246,27 @@ func LoadFileAndParseCommandLine(filename string, structPtr interface{}) error {
 	structVar(structPtr, tempSet, true)
 	err := tempSet.Parse(os.Args[1:])
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return loadErr
+	return tempSet.Args(), loadErr
 }
 
 // MustLoadFileAndParseCommandLine same as LoadFileAndParseCommandLine but panics on error
-func MustLoadFileAndParseCommandLine(filename string, structPtr interface{}) {
-	err := LoadFileAndParseCommandLine(filename, structPtr)
+func MustLoadFileAndParseCommandLine(filename string, structPtr interface{}) []string {
+	args, err := LoadFileAndParseCommandLine(filename, structPtr)
 	if err != nil {
 		panic(err)
 	}
+	return args
 }
 
 // LoadFileIfExistsAndMustParseCommandLine same as LoadFileAndParseCommandLine but panics on error
-func LoadFileIfExistsAndMustParseCommandLine(filename string, structPtr interface{}) {
-	err := LoadFileAndParseCommandLine(filename, structPtr)
+func LoadFileIfExistsAndMustParseCommandLine(filename string, structPtr interface{}) []string {
+	args, err := LoadFileAndParseCommandLine(filename, structPtr)
 	if err != nil && err != os.ErrNotExist {
 		panic(err)
 	}
+	return args
 }
 
 type structFieldAndValue struct {

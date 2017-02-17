@@ -372,14 +372,33 @@ func (c *Commands) AddWithArgs(command, description string, action func([]string
 	*c = append(*c, commandDetails{command, description, action})
 }
 
-// AddWithArg adds a command with a single string argument
+// AddWithArg adds a command with a single additional string argument
 func (c *Commands) AddWithArg(command, description string, action func(string) error) {
 	c.AddWithArgs(command, description, func(args []string) error {
-		var arg string
-		if len(args) > 0 {
-			arg = args[0]
+		if len(args) < 1 {
+			return ErrNotEnoughArguments
 		}
-		return action(arg)
+		return action(args[0])
+	})
+}
+
+// AddWith2Args adds a command with two additional string argument
+func (c *Commands) AddWith2Args(command, description string, action func(string, string) error) {
+	c.AddWithArgs(command, description, func(args []string) error {
+		if len(args) < 2 {
+			return ErrNotEnoughArguments
+		}
+		return action(args[0], args[1])
+	})
+}
+
+// AddWith3Args adds a command with threee additional string argument
+func (c *Commands) AddWith3Args(command, description string, action func(string, string, string) error) {
+	c.AddWithArgs(command, description, func(args []string) error {
+		if len(args) < 3 {
+			return ErrNotEnoughArguments
+		}
+		return action(args[0], args[1], args[2])
 	})
 }
 

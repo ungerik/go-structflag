@@ -351,19 +351,41 @@ func SaveJSON(filename string, structPtr interface{}, indent ...string) error {
 type commandDetails struct {
 	command     string
 	description string
-	action      func() error
+	action      func([]string) error
 }
 
-// ErrCommandNotFound is returned by Commands.Execute
-// if no matching command could be found.
-var ErrCommandNotFound = errors.New("Command not found")
+var (
+	// ErrCommandNotFound is returned by Commands.Execute
+	// if no matching command could be found.
+	ErrCommandNotFound = errors.New("Command not found")
+
+	// ErrNotEnoughArguments is returned when a command
+	// is called with not enough aruments
+	ErrNotEnoughArguments = errors.New("Not enough argumetns")
+)
 
 // Commands helps to parse and execute commands from command line arguments
 type Commands []commandDetails
 
+// AddWithArgs adds a command with additional string arguments
+func (c *Commands) AddWithArgs(command, description string, action func([]string) error) {
+	*c = append(*c, commandDetails{command, description, action})
+}
+
+// AddWithArg adds a command with a single string argument
+func (c *Commands) AddWithArg(command, description string, action func(string) error) {
+	c.AddWithArgs(command, description, func(args []string) error {
+		var arg string
+		if len(args) > 0 {
+			arg = args[0]
+		}
+		return action(arg)
+	})
+}
+
 // Add adds a command
 func (c *Commands) Add(command, description string, action func() error) {
-	*c = append(*c, commandDetails{command, description, action})
+	c.AddWithArgs(command, description, func([]string) error { return action() })
 }
 
 // PrintDescription prints a description of all commands to stderr
@@ -390,7 +412,7 @@ func (c *Commands) Execute(args []string) error {
 	command := args[0]
 	for _, comm := range *c {
 		if comm.command == command {
-			return comm.action()
+			return comm.action(args[1:])
 		}
 	}
 	return ErrCommandNotFound

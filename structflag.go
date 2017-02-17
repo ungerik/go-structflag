@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -345,4 +346,52 @@ func SaveJSON(filename string, structPtr interface{}, indent ...string) error {
 		return err
 	}
 	return ioutil.WriteFile(filename, data, 0660)
+}
+
+type commandDetails struct {
+	command     string
+	description string
+	action      func() error
+}
+
+// ErrCommandNotFound is returned by Commands.Execute
+// if no matching command could be found.
+var ErrCommandNotFound = errors.New("Command not found")
+
+// Commands helps to parse and execute commands from command line arguments
+type Commands []commandDetails
+
+// Add adds a command
+func (c *Commands) Add(command, description string, action func() error) {
+	*c = append(*c, commandDetails{command, description, action})
+}
+
+// PrintDescription prints a description of all commands to stderr
+func (c *Commands) PrintDescription() {
+	fmt.Fprint(os.Stderr, "Commands:\n")
+	for i, comm := range *c {
+		if comm.description == "" {
+			fmt.Fprintf(os.Stderr, "%d. %s\n\n", i+1, comm.command)
+		} else {
+			fmt.Fprintf(os.Stderr, "%d. %s: %s\n\n", i+1, comm.command, comm.description)
+		}
+	}
+	fmt.Fprint(os.Stderr, "Flags:\n")
+	PrintDefaults()
+}
+
+// Execute executes the command from args[0] or returns
+// ErrCommandNotFound if no such command was registered
+// of if len(args) == 0
+func (c *Commands) Execute(args []string) error {
+	if len(args) == 0 {
+		return ErrCommandNotFound
+	}
+	command := args[0]
+	for _, comm := range *c {
+		if comm.command == command {
+			return comm.action()
+		}
+	}
+	return ErrCommandNotFound
 }

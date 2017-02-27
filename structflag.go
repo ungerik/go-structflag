@@ -1,16 +1,10 @@
 package structflag
 
 import (
-	"encoding/json"
-	"encoding/xml"
-	"errors"
 	"flag"
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"reflect"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -295,4 +289,3 @@ func flatStructFields(v reflect.Value) []structFieldAndValue {
 	}
 	return fields
 }
-

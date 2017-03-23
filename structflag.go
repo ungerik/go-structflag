@@ -1,35 +1,57 @@
 package structflag
 
 import (
-	"flag"
 	"fmt"
 	"io"
 	"os"
 	"reflect"
 	"strconv"
 	"time"
+
+	"github.com/fatih/color"
+	"github.com/ogier/pflag"
 )
 
 // Flags is the minimal interface structflag needs to work.
 // It is a subset of flag.FlagSet
 type Flags interface {
 	Args() []string
+	Parse(arguments []string) error
+	PrintDefaults()
+
 	BoolVar(p *bool, name string, value bool, usage string)
 	DurationVar(p *time.Duration, name string, value time.Duration, usage string)
 	Float64Var(p *float64, name string, value float64, usage string)
 	Int64Var(p *int64, name string, value int64, usage string)
 	IntVar(p *int, name string, value int, usage string)
-	Parse(arguments []string) error
-	PrintDefaults()
 	StringVar(p *string, name string, value string, usage string)
 	Uint64Var(p *uint64, name string, value uint64, usage string)
 	UintVar(p *uint, name string, value uint, usage string)
-	Var(value flag.Value, name string, usage string)
+	Var(value pflag.Value, name string, usage string)
+}
+
+// FlagsP supports github.com/ogier/pflag
+type FlagsP interface {
+	Flags
+
+	BoolVarP(p *bool, name, shorthand string, value bool, usage string)
+	DurationVarP(p *time.Duration, name, shorthand string, value time.Duration, usage string)
+	Float64VarP(p *float64, name, shorthand string, value float64, usage string)
+	Int64VarP(p *int64, name, shorthand string, value int64, usage string)
+	IntVarP(p *int, name, shorthand string, value int, usage string)
+	StringVarP(p *string, name, shorthand string, value string, usage string)
+	Uint64VarP(p *uint64, name, shorthand string, value uint64, usage string)
+	UintVarP(p *uint, name, shorthand string, value uint, usage string)
+	VarP(value pflag.Value, name, shorthand string, usage string)
 }
 
 var (
 	// Output used for printing usage
 	Output io.Writer = os.Stderr
+
+	// FlagUsageColor is the color in which the
+	// flag usage will be printed on the screen.
+	FlagUsageColor = color.FgGreen
 
 	// AppName is the name of the application, defaults to os.Args[0]
 	AppName = os.Args[0]
@@ -37,11 +59,11 @@ var (
 	// OnParseError defines the behaviour if there is an
 	// error while parsing the flags.
 	// See https://golang.org/pkg/flag/#ErrorHandling
-	OnParseError = flag.ExitOnError
+	OnParseError = pflag.ExitOnError
 
 	// NewFlags returns new Flags, defaults to flag.NewFlagSet(AppName, OnParseError).
 	NewFlags = func() Flags {
-		flagSet := flag.NewFlagSet(AppName, OnParseError)
+		flagSet := pflag.NewFlagSet(AppName, OnParseError)
 		flagSet.Usage = PrintUsage
 		return flagSet
 	}
@@ -54,6 +76,10 @@ var (
 	// the struct field name as flag name.
 	// Struct fields with NameTag of "-" will be ignored.
 	NameTag = "flag"
+
+	// ShorthandTag is the struct tag used to define
+	// the possix shorthand command line argument.
+	ShorthandTag = "short"
 
 	// UsageTag is the struct tag used to give
 	// the usage description of a flag
@@ -69,7 +95,7 @@ var (
 )
 
 var (
-	flagValueType    = reflect.TypeOf((*flag.Value)(nil)).Elem()
+	pflagValueType   = reflect.TypeOf((*pflag.Value)(nil)).Elem()
 	timeDurationType = reflect.TypeOf(time.Duration(0))
 )
 
@@ -89,6 +115,7 @@ func StructVar(structPtr interface{}) {
 }
 
 func structVar(structPtr interface{}, flags Flags, fieldValuesAsDefault bool) {
+	flagsp, _ := flags.(FlagsP)
 	var err error
 	fields := flatStructFields(reflect.ValueOf(structPtr))
 	for _, field := range fields {
@@ -101,110 +128,172 @@ func structVar(structPtr interface{}, flags Flags, fieldValuesAsDefault bool) {
 		}
 		name = NameFunc(name)
 
+		shorthand, hasShorthand := field.Tag.Lookup(ShorthandTag)
+		hasShorthand = hasShorthand && (flagsp != nil)
+
 		usage := field.Tag.Get(UsageTag)
 
-		if field.Type.Implements(flagValueType) {
-			flags.Var(field.Value.Addr().Interface().(flag.Value), name, usage)
+		if field.Type.Implements(pflagValueType) {
+			val := field.Value.Addr().Interface().(pflag.Value)
+			if hasShorthand {
+				flagsp.VarP(val, name, shorthand, usage)
+			} else {
+				flags.Var(val, name, usage)
+			}
 			continue
 		}
 
 		defaultStr, hasDefault := field.Tag.Lookup(DefaultTag)
 
-		if field.Type == timeDurationType {
+		fieldType := field.Type
+		fieldValue := field.Value
+
+		isPtr := fieldType.Kind() == reflect.Ptr
+		if isPtr {
+			if fieldValue.IsNil() {
+				err = fmt.Errorf("pointer struct field '%s' must not be nil", field.Name)
+				panic(err)
+			}
+			fieldType = fieldType.Elem()
+			fieldValue = fieldValue.Elem()
+			fieldValuesAsDefault = !hasDefault
+		}
+
+		if fieldType == timeDurationType {
 			var value time.Duration
 			if fieldValuesAsDefault {
-				value = field.Value.Interface().(time.Duration)
+				value = fieldValue.Interface().(time.Duration)
 			} else if hasDefault {
 				value, err = time.ParseDuration(defaultStr)
 				if err != nil {
 					panic(err)
 				}
 			}
-			flags.DurationVar(field.Value.Addr().Interface().(*time.Duration), name, value, usage)
+			ptr := fieldValue.Addr().Interface().(*time.Duration)
+			if hasShorthand {
+				flagsp.DurationVarP(ptr, name, shorthand, value, usage)
+			} else {
+				flags.DurationVar(ptr, name, value, usage)
+			}
 			continue
 		}
 
-		switch field.Type.Kind() {
+		switch fieldType.Kind() {
 		case reflect.Bool:
 			var value bool
 			if fieldValuesAsDefault {
-				value = field.Value.Interface().(bool)
+				value = fieldValue.Interface().(bool)
 			} else if hasDefault {
 				value, err = strconv.ParseBool(defaultStr)
 				if err != nil {
 					panic(err)
 				}
 			}
-			flags.BoolVar(field.Value.Addr().Interface().(*bool), name, value, usage)
+			ptr := fieldValue.Addr().Interface().(*bool)
+			if hasShorthand {
+				flagsp.BoolVarP(ptr, name, shorthand, value, usage)
+			} else {
+				flags.BoolVar(ptr, name, value, usage)
+			}
 
 		case reflect.Float64:
 			var value float64
 			if fieldValuesAsDefault {
-				value = field.Value.Interface().(float64)
+				value = fieldValue.Interface().(float64)
 			} else if hasDefault {
 				value, err = strconv.ParseFloat(defaultStr, 64)
 				if err != nil {
 					panic(err)
 				}
 			}
-			flags.Float64Var(field.Value.Addr().Interface().(*float64), name, value, usage)
+			ptr := fieldValue.Addr().Interface().(*float64)
+			if hasShorthand {
+				flagsp.Float64VarP(ptr, name, shorthand, value, usage)
+			} else {
+				flags.Float64Var(ptr, name, value, usage)
+			}
 
 		case reflect.Int64:
 			var value int64
 			if fieldValuesAsDefault {
-				value = field.Value.Interface().(int64)
+				value = fieldValue.Interface().(int64)
 			} else if hasDefault {
 				value, err = strconv.ParseInt(defaultStr, 0, 64)
 				if err != nil {
 					panic(err)
 				}
 			}
-			flags.Int64Var(field.Value.Addr().Interface().(*int64), name, value, usage)
+			ptr := fieldValue.Addr().Interface().(*int64)
+			if hasShorthand {
+				flagsp.Int64VarP(ptr, name, shorthand, value, usage)
+			} else {
+				flags.Int64Var(ptr, name, value, usage)
+			}
 
 		case reflect.Int:
 			var value int64
 			if fieldValuesAsDefault {
-				value = int64(field.Value.Interface().(int))
+				value = int64(fieldValue.Interface().(int))
 			} else if hasDefault {
 				value, err = strconv.ParseInt(defaultStr, 0, 64)
 				if err != nil {
 					panic(err)
 				}
 			}
-			flags.IntVar(field.Value.Addr().Interface().(*int), name, int(value), usage)
+			ptr := fieldValue.Addr().Interface().(*int)
+			if hasShorthand {
+				flagsp.IntVarP(ptr, name, shorthand, int(value), usage)
+			} else {
+				flags.IntVar(ptr, name, int(value), usage)
+			}
 
 		case reflect.String:
 			var value string
 			if fieldValuesAsDefault {
-				value = field.Value.Interface().(string)
+				value = fieldValue.Interface().(string)
 			} else if hasDefault {
 				value = defaultStr
 			}
-			flags.StringVar(field.Value.Addr().Interface().(*string), name, value, usage)
+			ptr := fieldValue.Addr().Interface().(*string)
+			if hasShorthand {
+				flagsp.StringVarP(ptr, name, shorthand, value, usage)
+			} else {
+				flags.StringVar(ptr, name, value, usage)
+			}
 
 		case reflect.Uint64:
 			var value uint64
 			if fieldValuesAsDefault {
-				value = field.Value.Interface().(uint64)
+				value = fieldValue.Interface().(uint64)
 			} else if hasDefault {
 				value, err = strconv.ParseUint(defaultStr, 0, 64)
 				if err != nil {
 					panic(err)
 				}
 			}
-			flags.Uint64Var(field.Value.Addr().Interface().(*uint64), name, value, usage)
+			ptr := fieldValue.Addr().Interface().(*uint64)
+			if hasShorthand {
+				flagsp.Uint64VarP(ptr, name, shorthand, value, usage)
+			} else {
+				flags.Uint64Var(ptr, name, value, usage)
+			}
 
 		case reflect.Uint:
 			var value uint64
 			if fieldValuesAsDefault {
-				value = uint64(field.Value.Interface().(uint))
+				value = uint64(fieldValue.Interface().(uint))
 			} else if hasDefault {
 				value, err = strconv.ParseUint(defaultStr, 0, 64)
 				if err != nil {
 					panic(err)
 				}
 			}
-			flags.UintVar(field.Value.Addr().Interface().(*uint), name, uint(value), usage)
+			ptr := fieldValue.Addr().Interface().(*uint)
+			if hasShorthand {
+				flagsp.UintVarP(ptr, name, shorthand, uint(value), usage)
+			} else {
+				flags.UintVar(ptr, name, uint(value), usage)
+			}
 		}
 	}
 }
@@ -235,7 +324,9 @@ func PrintUsageTo(output io.Writer) {
 		}
 	}
 	if flags != nil {
+		color.Set(FlagUsageColor)
 		flags.PrintDefaults()
+		color.Unset()
 	}
 }
 

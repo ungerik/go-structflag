@@ -2,8 +2,9 @@ package structflag
 
 import (
 	"errors"
-	"fmt"
 	"strings"
+
+	"github.com/fatih/color"
 )
 
 type commandDetails struct {
@@ -26,6 +27,10 @@ var (
 	// ErrNotEnoughArguments is returned when a command
 	// is called with not enough aruments
 	ErrNotEnoughArguments = errors.New("Not enough argumetns")
+
+	// CommandUsageColor is the color in which the
+	// command usage will be printed on the screen.
+	CommandUsageColor = color.New(color.FgBlue)
 )
 
 // CommandList helps to parse and execute commands from command line arguments
@@ -79,15 +84,15 @@ func (c *CommandList) Add(action func() error, command string, description ...st
 	c.AddWithArgs(func([]string) error { return action() }, command, "", description...)
 }
 
-// PrintUsage prints a description of all commands to stderr
+// PrintUsage prints a description of all commands to Output
 func (c *CommandList) PrintUsage() {
 	for _, comm := range *c {
-		fmt.Fprintf(Output, "  %s %s %s\n", AppName, comm.command, comm.argDesc)
+		CommandUsageColor.Fprintf(Output, "  %s %s %s\n", AppName, comm.command, comm.argDesc)
 		if len(comm.commandDesc) == 0 {
-			fmt.Fprintln(Output)
+			CommandUsageColor.Fprintln(Output)
 		} else {
 			for _, desc := range comm.commandDesc {
-				fmt.Fprintf(Output, "      %s\n", desc)
+				CommandUsageColor.Fprintf(Output, "      %s\n", desc)
 			}
 		}
 	}

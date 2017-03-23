@@ -3,17 +3,23 @@ package structflag
 import (
 	"errors"
 	"fmt"
-	"os"
+	"strings"
 )
 
 type commandDetails struct {
 	command     string
-	description string
+	argDesc     string
+	commandDesc []string
 	action      func([]string) error
 }
 
 var (
-	// ErrCommandNotFound is returned by Commands.Execute
+	// Commands holds the global list of app commands.
+	// A command is an action executed by the application,
+	// something that is not saved in a configuration file.
+	Commands CommandList
+
+	// ErrCommandNotFound is returned by CommandList.Execute
 	// if no matching command could be found.
 	ErrCommandNotFound = errors.New("Command not found")
 
@@ -22,73 +28,81 @@ var (
 	ErrNotEnoughArguments = errors.New("Not enough argumetns")
 )
 
-// Commands helps to parse and execute commands from command line arguments
-type Commands []commandDetails
+// CommandList helps to parse and execute commands from command line arguments
+type CommandList []commandDetails
 
 // AddWithArgs adds a command with additional string arguments
-func (c *Commands) AddWithArgs(command, description string, action func([]string) error) {
-	*c = append(*c, commandDetails{command, description, action})
+func (c *CommandList) AddWithArgs(action func([]string) error, command, argDesc string, commandDesc ...string) {
+	*c = append(
+		*c,
+		commandDetails{
+			command:     command,
+			argDesc:     argDesc,
+			commandDesc: commandDesc,
+			action:      action,
+		},
+	)
 }
 
 // AddWithArg adds a command with a single additional string argument
-func (c *Commands) AddWithArg(command, description string, action func(string) error) {
-	c.AddWithArgs(command, description, func(args []string) error {
+func (c *CommandList) AddWithArg(action func(string) error, command, argDesc string, commandDesc ...string) {
+	c.AddWithArgs(func(args []string) error {
 		if len(args) < 1 {
 			return ErrNotEnoughArguments
 		}
 		return action(args[0])
-	})
+	}, command, argDesc, commandDesc...)
 }
 
 // AddWith2Args adds a command with two additional string argument
-func (c *Commands) AddWith2Args(command, description string, action func(string, string) error) {
-	c.AddWithArgs(command, description, func(args []string) error {
+func (c *CommandList) AddWith2Args(action func(string, string) error, command, argDesc string, commandDesc ...string) {
+	c.AddWithArgs(func(args []string) error {
 		if len(args) < 2 {
 			return ErrNotEnoughArguments
 		}
 		return action(args[0], args[1])
-	})
+	}, command, argDesc, commandDesc...)
 }
 
 // AddWith3Args adds a command with threee additional string argument
-func (c *Commands) AddWith3Args(command, description string, action func(string, string, string) error) {
-	c.AddWithArgs(command, description, func(args []string) error {
+func (c *CommandList) AddWith3Args(action func(string, string, string) error, command, argDesc string, commandDesc ...string) {
+	c.AddWithArgs(func(args []string) error {
 		if len(args) < 3 {
 			return ErrNotEnoughArguments
 		}
 		return action(args[0], args[1], args[2])
-	})
+	}, command, argDesc, commandDesc...)
 }
 
 // Add adds a command
-func (c *Commands) Add(command, description string, action func() error) {
-	c.AddWithArgs(command, description, func([]string) error { return action() })
+func (c *CommandList) Add(action func() error, command string, description ...string) {
+	c.AddWithArgs(func([]string) error { return action() }, command, "", description...)
 }
 
-// PrintDescription prints a description of all commands to stderr
-func (c *Commands) PrintDescription() {
-	fmt.Fprint(os.Stderr, "Commands:\n")
-	for i, comm := range *c {
-		if comm.description == "" {
-			fmt.Fprintf(os.Stderr, "%d. %s\n\n", i+1, comm.command)
+// PrintUsage prints a description of all commands to stderr
+func (c *CommandList) PrintUsage() {
+	for _, comm := range *c {
+		fmt.Fprintf(Output, "  %s %s %s\n", AppName, comm.command, comm.argDesc)
+		if len(comm.commandDesc) == 0 {
+			fmt.Fprintln(Output)
 		} else {
-			fmt.Fprintf(os.Stderr, "%d. %s: %s\n\n", i+1, comm.command, comm.description)
+			for _, desc := range comm.commandDesc {
+				fmt.Fprintf(Output, "      %s\n", desc)
+			}
 		}
 	}
-	fmt.Fprint(os.Stderr, "Flags:\n")
-	PrintDefaults()
 }
 
 // Execute executes the command from args[0] or returns
 // ErrCommandNotFound if no such command was registered
 // of if len(args) == 0
-func (c *Commands) Execute(args []string) error {
+func (c *CommandList) Execute(args []string) error {
 	if len(args) == 0 {
 		return ErrCommandNotFound
 	}
-	command := args[0]
+	command := strings.ToLower(args[0])
 	for _, comm := range *c {
-		if comm.command == command {
+		if strings.ToLower(comm.command) == command {
 			return comm.action(args[1:])
 		}
 	}

@@ -2,15 +2,17 @@ package structflag
 
 import (
 	"flag"
+	"fmt"
+	"io"
 	"os"
 	"reflect"
 	"strconv"
 	"time"
 )
 
-// Set is the minimal interface structflag needs to work.
+// Flags is the minimal interface structflag needs to work.
 // It is a subset of flag.FlagSet
-type Set interface {
+type Flags interface {
 	Args() []string
 	BoolVar(p *bool, name string, value bool, usage string)
 	DurationVar(p *time.Duration, name string, value time.Duration, usage string)
@@ -26,10 +28,25 @@ type Set interface {
 }
 
 var (
-	set Set
+	// Output used for printing usage
+	Output io.Writer = os.Stderr
 
-	// NewSet  defaults to flag.CommandLine of the standard flag package.
-	NewSet = func() Set { return flag.NewFlagSet(os.Args[0], flag.ExitOnError) }
+	// AppName is the name of the application, defaults to os.Args[0]
+	AppName = os.Args[0]
+
+	// OnParseError defines the behaviour if there is an
+	// error while parsing the flags.
+	// See https://golang.org/pkg/flag/#ErrorHandling
+	OnParseError = flag.ExitOnError
+
+	// NewFlags returns new Flags, defaults to flag.NewFlagSet(AppName, OnParseError).
+	NewFlags = func() Flags {
+		flagSet := flag.NewFlagSet(AppName, OnParseError)
+		flagSet.Usage = PrintUsage
+		return flagSet
+	}
+
+	flags Flags
 )
 
 var (
@@ -56,18 +73,22 @@ var (
 	timeDurationType = reflect.TypeOf(time.Duration(0))
 )
 
+func getOrCreateFlags() Flags {
+	if flags == nil {
+		flags = NewFlags()
+	}
+	return flags
+}
+
 // StructVar defines the fields of a struct as flags.
 // structPtr must be a pointer to a struct.
 // Anonoymous embedded fields are flattened.
 // Struct fields with NameTag of "-" will be ignored.
 func StructVar(structPtr interface{}) {
-	if set == nil {
-		set = NewSet()
-	}
-	structVar(structPtr, set, false)
+	structVar(structPtr, getOrCreateFlags(), false)
 }
 
-func structVar(structPtr interface{}, set Set, fieldValuesAsDefault bool) {
+func structVar(structPtr interface{}, flags Flags, fieldValuesAsDefault bool) {
 	var err error
 	fields := flatStructFields(reflect.ValueOf(structPtr))
 	for _, field := range fields {
@@ -83,7 +104,7 @@ func structVar(structPtr interface{}, set Set, fieldValuesAsDefault bool) {
 		usage := field.Tag.Get(UsageTag)
 
 		if field.Type.Implements(flagValueType) {
-			set.Var(field.Value.Addr().Interface().(flag.Value), name, usage)
+			flags.Var(field.Value.Addr().Interface().(flag.Value), name, usage)
 			continue
 		}
 
@@ -99,7 +120,7 @@ func structVar(structPtr interface{}, set Set, fieldValuesAsDefault bool) {
 					panic(err)
 				}
 			}
-			set.DurationVar(field.Value.Addr().Interface().(*time.Duration), name, value, usage)
+			flags.DurationVar(field.Value.Addr().Interface().(*time.Duration), name, value, usage)
 			continue
 		}
 
@@ -114,7 +135,7 @@ func structVar(structPtr interface{}, set Set, fieldValuesAsDefault bool) {
 					panic(err)
 				}
 			}
-			set.BoolVar(field.Value.Addr().Interface().(*bool), name, value, usage)
+			flags.BoolVar(field.Value.Addr().Interface().(*bool), name, value, usage)
 
 		case reflect.Float64:
 			var value float64
@@ -126,7 +147,7 @@ func structVar(structPtr interface{}, set Set, fieldValuesAsDefault bool) {
 					panic(err)
 				}
 			}
-			set.Float64Var(field.Value.Addr().Interface().(*float64), name, value, usage)
+			flags.Float64Var(field.Value.Addr().Interface().(*float64), name, value, usage)
 
 		case reflect.Int64:
 			var value int64
@@ -138,7 +159,7 @@ func structVar(structPtr interface{}, set Set, fieldValuesAsDefault bool) {
 					panic(err)
 				}
 			}
-			set.Int64Var(field.Value.Addr().Interface().(*int64), name, value, usage)
+			flags.Int64Var(field.Value.Addr().Interface().(*int64), name, value, usage)
 
 		case reflect.Int:
 			var value int64
@@ -150,7 +171,7 @@ func structVar(structPtr interface{}, set Set, fieldValuesAsDefault bool) {
 					panic(err)
 				}
 			}
-			set.IntVar(field.Value.Addr().Interface().(*int), name, int(value), usage)
+			flags.IntVar(field.Value.Addr().Interface().(*int), name, int(value), usage)
 
 		case reflect.String:
 			var value string
@@ -159,7 +180,7 @@ func structVar(structPtr interface{}, set Set, fieldValuesAsDefault bool) {
 			} else if hasDefault {
 				value = defaultStr
 			}
-			set.StringVar(field.Value.Addr().Interface().(*string), name, value, usage)
+			flags.StringVar(field.Value.Addr().Interface().(*string), name, value, usage)
 
 		case reflect.Uint64:
 			var value uint64
@@ -171,7 +192,7 @@ func structVar(structPtr interface{}, set Set, fieldValuesAsDefault bool) {
 					panic(err)
 				}
 			}
-			set.Uint64Var(field.Value.Addr().Interface().(*uint64), name, value, usage)
+			flags.Uint64Var(field.Value.Addr().Interface().(*uint64), name, value, usage)
 
 		case reflect.Uint:
 			var value uint64
@@ -183,36 +204,44 @@ func structVar(structPtr interface{}, set Set, fieldValuesAsDefault bool) {
 					panic(err)
 				}
 			}
-			set.UintVar(field.Value.Addr().Interface().(*uint), name, uint(value), usage)
+			flags.UintVar(field.Value.Addr().Interface().(*uint), name, uint(value), usage)
 		}
 	}
 }
 
 // Parse parses args, or if no args are given os.Args[1:]
 func Parse(args ...string) ([]string, error) {
-	if set == nil {
-		set = NewSet()
-	}
-	return parse(args, set)
+	return parse(args, getOrCreateFlags())
 }
 
-func parse(args []string, set Set) ([]string, error) {
+func parse(args []string, flags Flags) ([]string, error) {
 	if len(args) == 0 {
 		args = os.Args[1:]
 	}
-	err := set.Parse(args)
+	err := flags.Parse(args)
 	if err != nil {
 		return nil, err
 	}
-	return set.Args(), nil
+	return flags.Args(), nil
 }
 
-// PrintDefaults prints to standard error the default values of all defined command-line flags in the set.
-func PrintDefaults() {
-	if set == nil {
-		set = NewSet()
+// PrintUsageTo prints a description of all commands and flags of Set and Commands to output
+func PrintUsageTo(output io.Writer) {
+	if len(Commands) > 0 {
+		fmt.Fprint(Output, "Commands:\n")
+		Commands.PrintUsage()
+		if flags != nil {
+			fmt.Fprint(Output, "Flags:\n")
+		}
 	}
-	set.PrintDefaults()
+	if flags != nil {
+		flags.PrintDefaults()
+	}
+}
+
+// PrintUsage prints a description of all commands and flags of Set and Commands to Output
+func PrintUsage() {
+	PrintUsageTo(Output)
 }
 
 // LoadFileAndParseCommandLine loads the configuration from filename
@@ -223,8 +252,8 @@ func PrintDefaults() {
 // loaded from the configuration file.
 // If there is an error loading the configuration file,
 // then the command line still gets parsed.
-// The error os.ErrNotExist can be ignored if the existence
-// of the configuration file is optional.
+// An error where os.IsNotExist(err) == true can be ignored
+// if the existence of the configuration file is optional.
 func LoadFileAndParseCommandLine(filename string, structPtr interface{}) ([]string, error) {
 	// Initialize global variable set with unchanged default values
 	// so that a later PrintDefaults() prints the correct default values.
@@ -236,13 +265,13 @@ func LoadFileAndParseCommandLine(filename string, structPtr interface{}) ([]stri
 	// Use the existing struct values as defaults for tempSet
 	// so that not existing args don't overwrite existing values
 	// that have been loaded from the confriguration file
-	tempSet := NewSet()
-	structVar(structPtr, tempSet, true)
-	err := tempSet.Parse(os.Args[1:])
+	tempFlags := NewFlags()
+	structVar(structPtr, tempFlags, true)
+	err := tempFlags.Parse(os.Args[1:])
 	if err != nil {
 		return nil, err
 	}
-	return tempSet.Args(), loadErr
+	return tempFlags.Args(), loadErr
 }
 
 // MustLoadFileAndParseCommandLine same as LoadFileAndParseCommandLine but panics on error
@@ -288,4 +317,11 @@ func flatStructFields(v reflect.Value) []structFieldAndValue {
 		}
 	}
 	return fields
+}
+
+// PrintConfig prints the flattened struct fields from structPtr to Output.
+func PrintConfig(structPtr interface{}) {
+	for _, field := range flatStructFields(reflect.ValueOf(structPtr)) {
+		fmt.Fprintf(Output, "%s: %v\n", field.Name, field.Value.Interface())
+	}
 }

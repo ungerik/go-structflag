@@ -20,10 +20,6 @@ var (
 	// something that is not saved in a configuration file.
 	Commands CommandList
 
-	// ErrCommandNotFound is returned by CommandList.Execute
-	// if no matching command could be found.
-	ErrCommandNotFound = errors.New("Command not found")
-
 	// ErrNotEnoughArguments is returned when a command
 	// is called with not enough aruments
 	ErrNotEnoughArguments = errors.New("Not enough argumetns")
@@ -98,18 +94,20 @@ func (c *CommandList) PrintUsage() {
 	}
 }
 
-// Execute executes the command from args[0] or returns
-// ErrCommandNotFound if no such command was registered
-// of if len(args) == 0
-func (c *CommandList) Execute(args []string) error {
+// Execute executes the command from args[0] and returns the executed
+// command name and the error returned from the command function.
+// The error is ErrNotEnoughArguments if args did not have enough
+// extra arguments for the command.
+// Returns "", nil if no matching command was found, or if len(args) == 0
+func (c *CommandList) Execute(args []string) (command string, exeErr error) {
 	if len(args) == 0 {
-		return ErrCommandNotFound
+		return "", nil
 	}
-	command := strings.ToLower(args[0])
-	for _, comm := range *c {
-		if strings.ToLower(comm.command) == command {
-			return comm.action(args[1:])
+	commLower := strings.ToLower(args[0])
+	for _, details := range *c {
+		if strings.ToLower(details.command) == commLower {
+			return details.command, details.action(args[1:])
 		}
 	}
-	return ErrCommandNotFound
+	return "", nil
 }

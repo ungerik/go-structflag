@@ -377,7 +377,7 @@ func MustLoadFileAndParseCommandLine(filename string, structPtr interface{}) []s
 // LoadFileIfExistsAndMustParseCommandLine same as LoadFileAndParseCommandLine but panics on error
 func LoadFileIfExistsAndMustParseCommandLine(filename string, structPtr interface{}) []string {
 	args, err := LoadFileAndParseCommandLine(filename, structPtr)
-	if err != nil && err != os.ErrNotExist {
+	if err != nil && !os.IsNotExist(err) {
 		panic(err)
 	}
 	return args

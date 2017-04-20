@@ -22,7 +22,7 @@ var (
 
 	// ErrNotEnoughArguments is returned when a command
 	// is called with not enough aruments
-	ErrNotEnoughArguments = errors.New("Not enough argumetns")
+	ErrNotEnoughArguments = errors.New("not enough argumetns")
 
 	// CommandUsageColor is the color in which the
 	// command usage will be printed on the screen.
@@ -76,8 +76,14 @@ func (c *CommandList) AddWith3Args(action func(string, string, string) error, co
 }
 
 // Add adds a command
-func (c *CommandList) Add(action func() error, command string, description ...string) {
-	c.AddWithArgs(func([]string) error { return action() }, command, "", description...)
+func (c *CommandList) Add(action func() error, command string, commandDesc ...string) {
+	c.AddWithArgs(func([]string) error { return action() }, command, "", commandDesc...)
+}
+
+// AddDefault adds a command that is executed when no other command was
+// specified on the command line.
+func (c *CommandList) AddDefault(action func() error, commandDesc ...string) {
+	c.Add(action, "", commandDesc...)
 }
 
 // PrintUsage prints a description of all commands to Output
@@ -100,10 +106,10 @@ func (c *CommandList) PrintUsage() {
 // extra arguments for the command.
 // Returns "", nil if no matching command was found, or if len(args) == 0
 func (c *CommandList) Execute(args []string) (command string, exeErr error) {
-	if len(args) == 0 {
-		return "", nil
+	commLower := ""
+	if len(args) > 0 {
+		commLower = strings.ToLower(args[0])
 	}
-	commLower := strings.ToLower(args[0])
 	for _, details := range *c {
 		if strings.ToLower(details.command) == commLower {
 			return details.command, details.action(args[1:])

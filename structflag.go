@@ -6,6 +6,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/fatih/color"
@@ -45,13 +46,37 @@ type FlagsP interface {
 	VarP(value pflag.Value, name, shorthand string, usage string)
 }
 
+type flagSetColorOutputWrapper struct {
+}
+
+func (*flagSetColorOutputWrapper) Write(p []byte) (n int, err error) {
+	// return Output.Write(p)
+	written := 0
+	lines := strings.Split(strings.TrimSuffix(string(p), "\n"), "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "  -") {
+			n, err = FlagUsageColor.Fprintln(Output, line)
+		} else {
+			n, err = FlagDescriptionColor.Fprintln(Output, line)
+		}
+		written += n
+	}
+	return written, err
+}
+
 var (
+	flagSetColorOutput flagSetColorOutputWrapper
+
 	// Output used for printing usage
 	Output io.Writer = os.Stderr
 
 	// FlagUsageColor is the color in which the
 	// flag usage will be printed on the screen.
-	FlagUsageColor = color.FgGreen
+	FlagUsageColor = color.New(color.FgHiGreen)
+
+	// FlagDescriptionColor is the color in which the
+	// flag usage description will be printed on the screen.
+	FlagDescriptionColor = color.New(color.FgGreen)
 
 	// AppName is the name of the application, defaults to os.Args[0]
 	AppName = os.Args[0]
@@ -65,6 +90,7 @@ var (
 	NewFlags = func() Flags {
 		flagSet := pflag.NewFlagSet(AppName, OnParseError)
 		flagSet.Usage = PrintUsage
+		flagSet.SetOutput(&flagSetColorOutput)
 		return flagSet
 	}
 
@@ -324,9 +350,7 @@ func PrintUsageTo(output io.Writer) {
 		}
 	}
 	if flags != nil {
-		color.Set(FlagUsageColor)
 		flags.PrintDefaults()
-		color.Unset()
 	}
 }
 

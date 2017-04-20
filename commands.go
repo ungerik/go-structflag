@@ -26,7 +26,11 @@ var (
 
 	// CommandUsageColor is the color in which the
 	// command usage will be printed on the screen.
-	CommandUsageColor = color.New(color.FgBlue)
+	CommandUsageColor = color.New(color.FgHiCyan)
+
+	// CommandDescriptionColor is the color in which the
+	// command usage description will be printed on the screen.
+	CommandDescriptionColor = color.New(color.FgCyan)
 )
 
 // CommandList helps to parse and execute commands from command line arguments
@@ -91,10 +95,10 @@ func (c *CommandList) PrintUsage() {
 	for _, comm := range *c {
 		CommandUsageColor.Fprintf(Output, "  %s %s %s\n", AppName, comm.command, comm.argDesc)
 		if len(comm.commandDesc) == 0 {
-			CommandUsageColor.Fprintln(Output)
+			CommandDescriptionColor.Fprintln(Output)
 		} else {
 			for _, desc := range comm.commandDesc {
-				CommandUsageColor.Fprintf(Output, "      %s\n", desc)
+				CommandDescriptionColor.Fprintf(Output, "      %s\n", desc)
 			}
 		}
 	}
@@ -109,10 +113,11 @@ func (c *CommandList) Execute(args []string) (command string, exeErr error) {
 	commLower := ""
 	if len(args) > 0 {
 		commLower = strings.ToLower(args[0])
+		args = args[1:]
 	}
 	for _, details := range *c {
 		if strings.ToLower(details.command) == commLower {
-			return details.command, details.action(args[1:])
+			return details.command, details.action(args)
 		}
 	}
 	return "", nil

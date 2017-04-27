@@ -437,6 +437,10 @@ func flatStructFields(v reflect.Value) []structFieldAndValue {
 // PrintConfig prints the flattened struct fields from structPtr to Output.
 func PrintConfig(structPtr interface{}) {
 	for _, field := range flatStructFields(reflect.ValueOf(structPtr)) {
-		fmt.Fprintf(Output, "%s: %v\n", field.Name, field.Value.Interface())
+		v := field.Value
+		for v.Kind() == reflect.Ptr {
+			v = v.Elem()
+		}
+		fmt.Fprintf(Output, "%s: %v\n", field.Name, v.Interface())
 	}
 }

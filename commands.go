@@ -79,6 +79,26 @@ func (c *CommandList) AddWith3Args(action func(string, string, string) error, co
 	}, command, argDesc, commandDesc...)
 }
 
+// AddWith4Args adds a command with threee additional string argument
+func (c *CommandList) AddWith4Args(action func(string, string, string, string) error, command, argDesc string, commandDesc ...string) {
+	c.AddWithArgs(func(args []string) error {
+		if len(args) < 4 {
+			return ErrNotEnoughArguments
+		}
+		return action(args[0], args[1], args[2], args[3])
+	}, command, argDesc, commandDesc...)
+}
+
+// AddWith5Args adds a command with threee additional string argument
+func (c *CommandList) AddWith5Args(action func(string, string, string, string, string) error, command, argDesc string, commandDesc ...string) {
+	c.AddWithArgs(func(args []string) error {
+		if len(args) < 5 {
+			return ErrNotEnoughArguments
+		}
+		return action(args[0], args[1], args[2], args[3], args[4])
+	}, command, argDesc, commandDesc...)
+}
+
 // Add adds a command
 func (c *CommandList) Add(action func() error, command string, commandDesc ...string) {
 	c.AddWithArgs(func([]string) error { return action() }, command, "", commandDesc...)

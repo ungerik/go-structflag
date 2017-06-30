@@ -11,6 +11,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/ogier/pflag"
+	reflection "github.com/ungerik/go-reflection"
 )
 
 // Flags is the minimal interface structflag needs to work.
@@ -143,7 +144,7 @@ func StructVar(structPtr interface{}) {
 func structVar(structPtr interface{}, flags Flags, fieldValuesAsDefault bool) {
 	flagsp, _ := flags.(FlagsP)
 	var err error
-	fields := flatStructFields(reflect.ValueOf(structPtr))
+	fields := reflection.FlatStructFields(structPtr)
 	for _, field := range fields {
 		name := field.Tag.Get(NameTag)
 		if name == "-" {
@@ -407,36 +408,9 @@ func LoadFileIfExistsAndMustParseCommandLine(filename string, structPtr interfac
 	return args
 }
 
-type structFieldAndValue struct {
-	reflect.StructField
-	Value reflect.Value
-}
-
-// flatStructFields returns the structFieldAndValue of flattened struct fields,
-// meaning that the fields of anonoymous embedded fields are flattened
-// to the top level of the struct.
-func flatStructFields(v reflect.Value) []structFieldAndValue {
-	for v.Kind() == reflect.Ptr {
-		v = v.Elem()
-	}
-	t := v.Type()
-	numField := t.NumField()
-	fields := make([]structFieldAndValue, 0, numField)
-	for i := 0; i < numField; i++ {
-		ft := t.Field(i)
-		fv := v.Field(i)
-		if ft.Anonymous {
-			fields = append(fields, flatStructFields(fv)...)
-		} else {
-			fields = append(fields, structFieldAndValue{ft, fv})
-		}
-	}
-	return fields
-}
-
 // PrintConfig prints the flattened struct fields from structPtr to Output.
 func PrintConfig(structPtr interface{}) {
-	for _, field := range flatStructFields(reflect.ValueOf(structPtr)) {
+	for _, field := range reflection.FlatStructFields(structPtr) {
 		v := field.Value
 		for v.Kind() == reflect.Ptr {
 			v = v.Elem()

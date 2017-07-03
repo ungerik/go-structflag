@@ -144,24 +144,23 @@ func StructVar(structPtr interface{}) {
 func structVar(structPtr interface{}, flags Flags, fieldValuesAsDefault bool) {
 	flagsp, _ := flags.(FlagsP)
 	var err error
-	fields := reflection.FlatStructFields(structPtr)
-	for _, field := range fields {
-		name := field.Tag.Get(NameTag)
+	for _, f := range reflection.FlatExportedStructFields(structPtr) {
+		name := f.Field.Tag.Get(NameTag)
 		if name == "-" {
 			continue
 		}
 		if name == "" {
-			name = field.Name
+			name = f.Field.Name
 		}
 		name = NameFunc(name)
 
-		shorthand, hasShorthand := field.Tag.Lookup(ShorthandTag)
+		shorthand, hasShorthand := f.Field.Tag.Lookup(ShorthandTag)
 		hasShorthand = hasShorthand && (flagsp != nil)
 
-		usage := field.Tag.Get(UsageTag)
+		usage := f.Field.Tag.Get(UsageTag)
 
-		if field.Type.Implements(pflagValueType) {
-			val := field.Value.Addr().Interface().(pflag.Value)
+		if f.Field.Type.Implements(pflagValueType) {
+			val := f.Value.Addr().Interface().(pflag.Value)
 			if hasShorthand {
 				flagsp.VarP(val, name, shorthand, usage)
 			} else {
@@ -170,15 +169,15 @@ func structVar(structPtr interface{}, flags Flags, fieldValuesAsDefault bool) {
 			continue
 		}
 
-		defaultStr, hasDefault := field.Tag.Lookup(DefaultTag)
+		defaultStr, hasDefault := f.Field.Tag.Lookup(DefaultTag)
 
-		fieldType := field.Type
-		fieldValue := field.Value
+		fieldType := f.Field.Type
+		fieldValue := f.Value
 
 		isPtr := fieldType.Kind() == reflect.Ptr
 		if isPtr {
 			if fieldValue.IsNil() {
-				err = fmt.Errorf("pointer struct field '%s' must not be nil", field.Name)
+				err = fmt.Errorf("pointer struct field '%s' must not be nil", f.Field.Name)
 				panic(err)
 			}
 			fieldType = fieldType.Elem()
@@ -410,11 +409,11 @@ func LoadFileIfExistsAndMustParseCommandLine(filename string, structPtr interfac
 
 // PrintConfig prints the flattened struct fields from structPtr to Output.
 func PrintConfig(structPtr interface{}) {
-	for _, field := range reflection.FlatStructFields(structPtr) {
-		v := field.Value
+	for _, f := range reflection.FlatExportedStructFields(structPtr) {
+		v := f.Value
 		for v.Kind() == reflect.Ptr {
 			v = v.Elem()
 		}
-		fmt.Fprintf(Output, "%s: %v\n", field.Name, v.Interface())
+		fmt.Fprintf(Output, "%s: %v\n", f.Field.Name, v.Interface())
 	}
 }

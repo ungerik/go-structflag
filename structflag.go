@@ -82,6 +82,8 @@ var (
 	// AppName is the name of the application, defaults to os.Args[0]
 	AppName = os.Args[0]
 
+	PrintUsageIntro = PrintCommandsUsageIntro
+
 	// OnParseError defines the behaviour if there is an
 	// error while parsing the flags.
 	// See https://golang.org/pkg/flag/#ErrorHandling
@@ -340,14 +342,20 @@ func parse(args []string, flags Flags) ([]string, error) {
 	return flags.Args(), nil
 }
 
-// PrintUsageTo prints a description of all commands and flags of Set and Commands to output
-func PrintUsageTo(output io.Writer) {
+func PrintCommandsUsageIntro(output io.Writer) {
 	if len(Commands) > 0 {
 		fmt.Fprint(Output, "Commands:\n")
 		Commands.PrintUsage()
 		if flags != nil {
 			fmt.Fprint(Output, "Flags:\n")
 		}
+	}
+}
+
+// PrintUsageTo prints a description of all commands and flags of Set and Commands to output
+func PrintUsageTo(output io.Writer) {
+	if PrintUsageIntro != nil {
+		PrintUsageIntro(output)
 	}
 	if flags != nil {
 		flags.PrintDefaults()

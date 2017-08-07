@@ -1,7 +1,6 @@
 package structflag
 
 import (
-	"errors"
 	"strings"
 
 	"github.com/fatih/color"
@@ -14,18 +13,27 @@ type commandDetails struct {
 	action      func([]string) error
 }
 
+type constError string
+
+func (e constError) Error() string {
+	return string(e)
+}
+
+const (
+
+	// ErrCommandNotFound is returned when a command was not found
+	ErrCommandNotFound = constError("command not found")
+
+	// ErrNotEnoughArguments is returned when a command
+	// is called with not enough aruments
+	ErrNotEnoughArguments = constError("not enough argumetns")
+)
+
 var (
 	// Commands holds the global list of app commands.
 	// A command is an action executed by the application,
 	// something that is not saved in a configuration file.
 	Commands CommandList
-
-	// ErrCommandNotFound is returned when a command was not found
-	ErrCommandNotFound = errors.New("command not found")
-
-	// ErrNotEnoughArguments is returned when a command
-	// is called with not enough aruments
-	ErrNotEnoughArguments = errors.New("not enough argumetns")
 
 	// CommandUsageColor is the color in which the
 	// command usage will be printed on the screen.

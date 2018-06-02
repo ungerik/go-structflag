@@ -140,7 +140,7 @@ func getOrCreateFlags() Flags {
 // Anonoymous embedded fields are flattened.
 // Struct fields with NameTag of "-" will be ignored.
 func StructVar(structPtr interface{}) {
-	structVar(structPtr, getOrCreateFlags(), false)
+	structVar(structPtr, getOrCreateFlags(), true)
 }
 
 func structVar(structPtr interface{}, flags Flags, fieldValuesAsDefault bool) {

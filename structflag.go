@@ -11,6 +11,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/ogier/pflag"
+
 	reflection "github.com/ungerik/go-reflection"
 )
 
@@ -390,6 +391,13 @@ func LoadFileAndParseCommandLine(filename string, structPtr interface{}) ([]stri
 	// that have been loaded from the confriguration file
 	tempFlags := NewFlags()
 	structVar(structPtr, tempFlags, true)
+
+	// If called by a test, then return without parsing args
+	// because the "-test" flag syntax is not supported
+	if len(os.Args) > 1 && strings.HasPrefix(os.Args[1], "-test") {
+		return nil, loadErr
+	}
+
 	err := tempFlags.Parse(os.Args[1:])
 	if err != nil {
 		return nil, err

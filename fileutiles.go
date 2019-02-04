@@ -20,7 +20,7 @@ func LoadFile(filename string, structPtr interface{}) error {
 	case ".xml":
 		return LoadXML(filename, structPtr)
 	}
-	return errors.New("File extension not supported: " + ext)
+	return errors.New("file extension not supported: " + ext)
 }
 
 // LoadXML loads a struct from a XML file

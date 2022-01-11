@@ -25,7 +25,7 @@ func LoadFile(filename string, structPtr interface{}) error {
 
 // LoadXML loads a struct from a XML file
 func LoadXML(filename string, structPtr interface{}) error {
-	data, err := ioutil.ReadFile(filename)
+	data, err := ioutil.ReadFile(filename) //#nosec G304
 	if err != nil {
 		return err
 	}
@@ -39,12 +39,12 @@ func SaveXML(filename string, structPtr interface{}, indent ...string) error {
 		return err
 	}
 	data = append([]byte(xml.Header), data...)
-	return ioutil.WriteFile(filename, data, 0660)
+	return ioutil.WriteFile(filename, data, 0600)
 }
 
 // LoadJSON loads a struct from a JSON file
 func LoadJSON(filename string, structPtr interface{}) error {
-	data, err := ioutil.ReadFile(filename)
+	data, err := ioutil.ReadFile(filename) //#nosec G304
 	if err != nil {
 		return err
 	}
@@ -57,5 +57,5 @@ func SaveJSON(filename string, structPtr interface{}, indent ...string) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(filename, data, 0660)
+	return ioutil.WriteFile(filename, data, 0600)
 }

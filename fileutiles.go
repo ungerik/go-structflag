@@ -12,6 +12,7 @@ import (
 // LoadFile loads a struct from a JSON or XML file.
 // The file type is determined by the file extension.
 func LoadFile(filename string, structPtr interface{}) error {
+	filename = filepath.Clean(filename)
 	// Load and unmarshal struct from file
 	ext := strings.ToLower(filepath.Ext(filename))
 	switch ext {
@@ -25,6 +26,7 @@ func LoadFile(filename string, structPtr interface{}) error {
 
 // LoadXML loads a struct from a XML file
 func LoadXML(filename string, structPtr interface{}) error {
+	filename = filepath.Clean(filename)
 	data, err := ioutil.ReadFile(filename) //#nosec G304
 	if err != nil {
 		return err
@@ -34,6 +36,7 @@ func LoadXML(filename string, structPtr interface{}) error {
 
 // SaveXML saves a struct as a XML file
 func SaveXML(filename string, structPtr interface{}, indent ...string) error {
+	filename = filepath.Clean(filename)
 	data, err := xml.MarshalIndent(structPtr, "", strings.Join(indent, ""))
 	if err != nil {
 		return err
@@ -44,6 +47,7 @@ func SaveXML(filename string, structPtr interface{}, indent ...string) error {
 
 // LoadJSON loads a struct from a JSON file
 func LoadJSON(filename string, structPtr interface{}) error {
+	filename = filepath.Clean(filename)
 	data, err := ioutil.ReadFile(filename) //#nosec G304
 	if err != nil {
 		return err
@@ -53,6 +57,7 @@ func LoadJSON(filename string, structPtr interface{}) error {
 
 // SaveJSON saves a struct as a JSON file
 func SaveJSON(filename string, structPtr interface{}, indent ...string) error {
+	filename = filepath.Clean(filename)
 	data, err := json.MarshalIndent(structPtr, "", strings.Join(indent, ""))
 	if err != nil {
 		return err

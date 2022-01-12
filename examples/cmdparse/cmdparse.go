@@ -24,8 +24,10 @@ var config Config
 
 func main() {
 	structflag.StructVar(&config)
-	structflag.Parse()
-
+	_, err := structflag.Parse()
+	if err != nil {
+		panic(err)
+	}
 	j, err := json.MarshalIndent(&config, "", "  ")
 	if err != nil {
 		panic(err)

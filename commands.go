@@ -123,6 +123,7 @@ func (c *CommandList) AddDefault(action func() error, commandDesc ...string) {
 
 // PrintUsage prints a description of all commands to Output
 func (c *CommandList) PrintUsage() {
+	//#nosec G104 -- print error ignored
 	for _, comm := range *c {
 		CommandUsageColor.Fprintf(Output, "  %s %s %s\n", AppName, comm.command, comm.argDesc)
 		if len(comm.commandDesc) == 0 {

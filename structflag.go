@@ -368,6 +368,27 @@ func PrintUsage() {
 	PrintUsageTo(Output)
 }
 
+// ParseCommandLine without loading any configuration
+func ParseCommandLine() ([]string, error) {
+	flags := NewFlags()
+	err := flags.Parse(os.Args[1:])
+	if err != nil {
+		return nil, err
+	}
+	return flags.Args(), nil
+}
+
+// MustParseCommandLine without loading any configuration.
+// Panics in case of an error.
+func MustParseCommandLine() []string {
+	flags := NewFlags()
+	err := flags.Parse(os.Args[1:])
+	if err != nil {
+		panic(err)
+	}
+	return flags.Args()
+}
+
 // LoadFileAndParseCommandLine loads the configuration from filename
 // into structPtr and then parses the command line.
 // Every value that is present in command line overwrites the
